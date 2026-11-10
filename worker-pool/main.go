@@ -2,13 +2,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
-	"time"
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	var wg sync.WaitGroup
 
@@ -25,4 +24,5 @@ func main() {
 
 	close(jobs)
 	wg.Wait()
+	fmt.Println("Program finished")
 }
