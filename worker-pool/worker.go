@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-func worker(ctx context.Context, id int, jobs <-chan int, wg *sync.WaitGroup) {
+func worker(ctx context.Context, id int, jobs <-chan Job, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for {
@@ -16,7 +16,10 @@ func worker(ctx context.Context, id int, jobs <-chan int, wg *sync.WaitGroup) {
 			return
 		case job, ok := <-jobs:
 			if ok {
-				processJob(ctx, job)
+				err := job.Process(ctx)
+				if err != nil {
+					fmt.Println("Job error:", err)
+				}
 			} else {
 				fmt.Println("Worker finished:", id)
 				return
