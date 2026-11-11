@@ -10,11 +10,11 @@ func retryJob(ctx context.Context, doJob func() error) error {
 	var err error
 
 	for i := 1; i < 4; i++ {
-		err = doJob()
 
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
+		err = doJob()
 
 		if err == nil {
 			fmt.Printf("Job done at %v attempt", i)
