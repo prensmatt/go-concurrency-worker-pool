@@ -55,9 +55,9 @@ func CreateJob(w http.ResponseWriter,r *http.Request, db *sql.DB){
 	err = db.QueryRowContext(
 		r.Context(),
 		query,
-		req.JobID,
-		req.Type,
-		req.Payload,
+		job.JobID,
+		job.Type,
+		job.Payload,
 	).Scan(
 		&job.ID,
 		&job.Status,
@@ -73,6 +73,44 @@ func CreateJob(w http.ResponseWriter,r *http.Request, db *sql.DB){
 	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(job); err != nil{
+		return
+	}
+}
+
+func GetJobs(w http.ResponseWriter, r *http.Request, db *sql.DB){
+	if r.Method != http.MethodGet{
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
+	query := `SELECT id, job_id, type, payload, status, created_at FROM jobs`
+
+	rows, err := db.QueryContext(r.Context(), query)
+	if err != nil{
+		http.Error(w, "Failed to fetch jobs", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+	
+	jobs := make([]Job,0)
+
+	for rows.Next(){
+		var job Job
+		err := rows.Scan(&job.ID,&job.JobID,&job.Type,&job.Payload,&job.Status,&job.CreatedAt)
+		if err != nil{
+			http.Error(w, "Could not scan jobs", http.StatusInternalServerError)
+			return
+		}
+		jobs = append(jobs, job)
+	}
+	if rows.Err()!= nil{
+		http.Error(w, "Could not scan jobs", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type","application/json")
+	w.WriteHeader(http.StatusOK)
+
+	if err := json.NewEncoder(w).Encode(jobs);err != nil{
 		return
 	}
 }
