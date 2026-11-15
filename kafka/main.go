@@ -28,6 +28,9 @@ func main() {
 	http.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		GetJobByID(w, r, db)
 	})
+	http.HandleFunc("PUT /jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		UpdateJob(w, r, db)
+	})
 
 	log.Println("Server running on :8000")
 	log.Fatal(http.ListenAndServe(":8000", nil))

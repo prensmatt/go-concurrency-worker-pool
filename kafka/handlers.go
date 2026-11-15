@@ -156,3 +156,57 @@ func GetJobByID(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 }
+
+func UpdateJob(w http.ResponseWriter, r *http.Request, db *sql.DB){
+	if r.Method != http.MethodPut{
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil{
+		http.Error(w,"Could not convert to integer", http.StatusBadRequest)
+		return
+	}
+	if id <= 0{
+		http.Error(w, "ID must be greater than 0", http.StatusBadRequest)
+		return
+	}
+	var req UpdateJobRequest
+	err = json.NewDecoder(r.Body).Decode(&req)
+	if err != nil{
+		http.Error(w, "Invalid JSON value", http.StatusBadRequest)
+		return
+	}
+	if req.Status == ""{
+		http.Error(w, "Invalid Status value", http.StatusBadRequest)
+		return
+	}
+	switch req.Status{
+	case "pending":
+	case "processing":
+	case "completed":
+	case "failed":
+	default:
+		http.Error(w, "Invalid Status value", http.StatusBadRequest)
+		return
+	}
+
+	query := `UPDATE jobs SET status = $1 WHERE id = $2`
+	result,err := db.ExecContext(r.Context(), query, req.Status, id)
+
+	if err != nil{
+		http.Error(w, "could not update job", http.StatusInternalServerError)
+		return
+	}
+	rows,err := result.RowsAffected()
+	if err != nil {
+		http.Error(w,"Could not get affected rows", http.StatusInternalServerError)
+		return
+	}
+	if rows == 0 {
+		http.Error(w, "Job not found", http.StatusNotFound)
+    return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
