@@ -210,3 +210,40 @@ func UpdateJob(w http.ResponseWriter, r *http.Request, db *sql.DB){
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func DeleteJob(w http.ResponseWriter, r *http.Request, db *sql.DB){
+
+	if r.Method != http.MethodDelete {
+    http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+    return
+}
+
+	idStr := r.PathValue("id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+
+	if err != nil{
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	if id <= 0 {
+		http.Error(w, "id must be greater than 0", http.StatusBadRequest)
+		return
+	}
+
+	query := `DELETE FROM jobs WHERE id=$1`
+	result,err := db.ExecContext(r.Context(),query,id)
+	if err != nil{
+		http.Error(w, "could not delete job", http.StatusInternalServerError)
+		return
+	}
+	rows, err := result.RowsAffected()
+	if err != nil{
+		http.Error(w, "could not get affected rows", http.StatusInternalServerError)
+		return
+	}
+	if rows == 0{
+		http.Error(w, "job not found", http.StatusNotFound)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
