@@ -8,6 +8,12 @@ import(
 )
 
 func CreateJob(w http.ResponseWriter,r *http.Request, db *sql.DB){
+	
+	if r.Method != http.MethodPost{
+		http.Error(w,"Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	
 	var req CreateJobRequest
 
 	err := json.NewDecoder(r.Body).Decode(&req)
