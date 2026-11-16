@@ -23,3 +23,9 @@ type CreateJobRequest struct{
 type UpdateJobRequest struct{
 	Status string `json:"status"`
 }
+
+type JobMessage struct{
+	JobID    string  				 `json:"job_id"`
+	Type     string 				 `json:"type"`
+	Payload  json.RawMessage `json:"payload"`
+}
