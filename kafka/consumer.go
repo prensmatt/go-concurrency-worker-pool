@@ -7,6 +7,7 @@ import (
 	"strings"
 	"database/sql"
 	"encoding/json"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -38,7 +39,7 @@ func main() {
 			fmt.Println("Failed to read message:", err)
 			return
 		}
-		err = ProcessMessage(ctx, message, db)
+		err = ProcessWithRetry(ctx, message, db)
 		if err != nil{
 			fmt.Println("Failed to process message:",err)
 			return
@@ -86,3 +87,33 @@ func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB)error
 	return nil
 }
 
+func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB)error{
+	maxAttempts := 3
+	var lastErr error
+	
+	for attempt := 1; attempt <= maxAttempts; attempt++{
+		if err := ctx.Err(); err != nil{
+			lastErr = err
+			return err
+		}
+
+		err := ProcessMessage(ctx, message, db)
+		if err == nil{
+			return nil
+		}
+
+		lastErr = err
+
+		if attempt < maxAttempts{
+			delay := time.Duration(attempt)*time.Second
+
+			select{
+			case <-time.After(delay):
+				fmt.Println("Retrying...")
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+	return fmt.Errorf("all retry attempts failed: %w", lastErr)
+}
