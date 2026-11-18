@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
 )
 
 func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
@@ -43,10 +42,10 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-//add transaction
+	//add transaction
 
 	tx, err := db.BeginTx(r.Context(), nil)
-	if err != nil{
+	if err != nil {
 		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
 		return
 	}
@@ -82,12 +81,12 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	}
 
 	message := JobMessage{
-		JobID: job.JobID,
-		Type: job.Type,
+		JobID:   job.JobID,
+		Type:    job.Type,
 		Payload: job.Payload,
 	}
 	messageJSON, err := json.Marshal(message)
-	if err != nil{
+	if err != nil {
 		http.Error(w, "Failed to encode message", http.StatusInternalServerError)
 		return
 	}
@@ -97,13 +96,13 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	VALUES ($1, $2, $3)
 	`
 	_, err = tx.ExecContext(r.Context(), outboxQuery, job.JobID, "jobs", messageJSON)
-	if err != nil{
+	if err != nil {
 		http.Error(w, "Failed to save outbox message", http.StatusInternalServerError)
 		return
 	}
 
-	if err := tx.Commit(); err != nil{
-		http.Error(w,"Failed to commit transaction", http.StatusInternalServerError)
+	if err := tx.Commit(); err != nil {
+		http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
 		return
 	}
 

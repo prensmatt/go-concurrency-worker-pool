@@ -36,3 +36,10 @@ type DLQMessage struct {
 	ErrorReason   string          `json:"error_reason"`
 	FailedAt      time.Time       `json:"failed_at"`
 }
+
+type OutboxJobMessage struct {
+	ID      int64           `json:"id"`
+	JobID   string          `json:"job_id"`
+	Topic   string          `json:"topic"`
+	Payload json.RawMessage `json:"payload"`
+}

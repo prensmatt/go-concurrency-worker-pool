@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net/http"
-
 )
 
 func main() {
@@ -12,7 +11,6 @@ func main() {
 		log.Fatal("Database connection failed:", err)
 	}
 	defer db.Close()
-
 
 	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
