@@ -29,3 +29,10 @@ type JobMessage struct{
 	Type     string 				 `json:"type"`
 	Payload  json.RawMessage `json:"payload"`
 }
+
+type DLQMessage struct{
+	OriginalTopic  string						`json:"original_topic"`
+	OriginalValue  json.RawMessage  `json:"original_value"`
+	ErrorReason    string						`json:"error_reason"`
+	FailedAt       time.Time				`json:"failed_at"`
+}

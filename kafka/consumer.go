@@ -32,6 +32,14 @@ func main() {
 
 	defer reader.Close()
 
+	dlqWriter := &kafka.Writer{
+    Addr:     kafka.TCP(brokerAddress),
+    Topic:    "jobs-dlq",
+    Balancer: &kafka.LeastBytes{},
+	}
+
+	defer dlqWriter.Close()
+	
 	ctx := context.Background()
 	for {
 		message, err := reader.FetchMessage(ctx)
@@ -40,9 +48,15 @@ func main() {
 			return
 		}
 		err = ProcessWithRetry(ctx, message, db)
-		if err != nil{
-			fmt.Println("Failed to process message:",err)
-			return
+		if err != nil {
+			fmt.Println("Failed to process message:", err)
+
+			if dlqErr := SendToDLQ(ctx, dlqWriter, message); dlqErr != nil {
+				fmt.Println("Failed to send message to DLQ:", dlqErr)
+				return
+			}
+
+			fmt.Println("Message sent to DLQ successfully!")
 		}
 
 		if err := reader.CommitMessages(ctx, message); err != nil {
@@ -54,20 +68,23 @@ func main() {
 
 }
 
+var ErrInvalidMessage error = errors.New("invalid message")
+
+
 func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB)error{
 	var input JobMessage
 
 	err := json.Unmarshal(message.Value, &input)
 	if err != nil{
-		return err
+		return fmt.Errorf("%w: %v", ErrInvalidMessage, err)
 	}
 
 	if strings.TrimSpace(input.JobID) == "" {
-    return errors.New("job_id is required")
+    return ErrInvalidMessage
 	}
 
 	if strings.TrimSpace(input.Type) == "" {
-			return errors.New("type is required")
+			return ErrInvalidMessage
 	}
 
 	query := `INSERT INTO jobs (job_id, type, payload) VALUES($1, $2, $3)
@@ -87,6 +104,7 @@ func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB)error
 	return nil
 }
 
+
 func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB)error{
 	maxAttempts := 3
 	var lastErr error
@@ -98,6 +116,9 @@ func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB)err
 		}
 
 		err := ProcessMessage(ctx, message, db)
+		if errors.Is(err, ErrInvalidMessage){
+			return err
+		}
 		if err == nil{
 			return nil
 		}
@@ -116,4 +137,10 @@ func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB)err
 		}
 	}
 	return fmt.Errorf("all retry attempts failed: %w", lastErr)
+}
+
+func SendToDLQ(ctx context.Context, writer *kafka.Writer, message kafka.Message) error {
+    message.Topic = ""
+    err := writer.WriteMessages(ctx, message)
+    return err
 }

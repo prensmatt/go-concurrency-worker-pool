@@ -24,14 +24,7 @@ func main() {
 	err := writer.WriteMessages(ctx,
 		kafka.Message{
 			Key:   []byte("job-1"),
-			Value: []byte(`{
-					"job_id": "job-2",
-					"type": "email",
-					"payload": {
-							"to": "Ereh@aot.levi",
-							"subject": "Tatakae or shindegre"
-					}
-			}`),
+			Value: []byte(`{"type": "email"}`),
 		},
 	)
 	if err != nil {
