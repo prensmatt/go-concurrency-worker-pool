@@ -2,34 +2,25 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 
 	"github.com/segmentio/kafka-go"
 )
 
-func main() {
-	brokerAddress := "localhost:9092"
-	topic := "jobs"
+func PublishJob(ctx context.Context, writer *kafka.Writer, job JobMessage) error {
 
-	writer := &kafka.Writer{
-		Addr:     kafka.TCP(brokerAddress),
-		Topic:    topic,
-		Balancer: &kafka.LeastBytes{},
+	value, err := json.Marshal(job)
+	if err != nil {
+		return err
 	}
-
-	defer writer.Close()
-
-	ctx := context.Background()
-
-	err := writer.WriteMessages(ctx,
+	err = writer.WriteMessages(ctx,
 		kafka.Message{
-			Key:   []byte("job-1"),
-			Value: []byte(`{"type": "email"}`),
+			Key:   []byte(job.JobID),
+			Value: value,
 		},
 	)
 	if err != nil {
-		fmt.Println("Failed to write message:", err)
-		return
+		return err
 	}
-	fmt.Println("Message sent successfully!")
+	return nil
 }

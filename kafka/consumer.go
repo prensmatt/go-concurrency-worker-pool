@@ -2,23 +2,23 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"errors"
-	"strings"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 )
 
-func main() {
+func runConsumer() {
 
 	brokerAddress := "localhost:9092"
 	topic := "jobs"
 
 	db, err := ConnectDB()
-	if err != nil{
+	if err != nil {
 		fmt.Println("Database connection failed:", err)
 		return
 	}
@@ -33,13 +33,13 @@ func main() {
 	defer reader.Close()
 
 	dlqWriter := &kafka.Writer{
-    Addr:     kafka.TCP(brokerAddress),
-    Topic:    "jobs-dlq",
-    Balancer: &kafka.LeastBytes{},
+		Addr:     kafka.TCP(brokerAddress),
+		Topic:    "jobs-dlq",
+		Balancer: &kafka.LeastBytes{},
 	}
 
 	defer dlqWriter.Close()
-	
+
 	ctx := context.Background()
 	for {
 		message, err := reader.FetchMessage(ctx)
@@ -51,7 +51,7 @@ func main() {
 		if err != nil {
 			fmt.Println("Failed to process message:", err)
 
-			if dlqErr := SendToDLQ(ctx, dlqWriter, message); dlqErr != nil {
+			if dlqErr := SendToDLQ(ctx, dlqWriter, message, err); dlqErr != nil {
 				fmt.Println("Failed to send message to DLQ:", dlqErr)
 				return
 			}
@@ -70,21 +70,20 @@ func main() {
 
 var ErrInvalidMessage error = errors.New("invalid message")
 
-
-func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB)error{
+func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB) error {
 	var input JobMessage
 
 	err := json.Unmarshal(message.Value, &input)
-	if err != nil{
+	if err != nil {
 		return fmt.Errorf("%w: %v", ErrInvalidMessage, err)
 	}
 
 	if strings.TrimSpace(input.JobID) == "" {
-    return ErrInvalidMessage
+		return ErrInvalidMessage
 	}
 
 	if strings.TrimSpace(input.Type) == "" {
-			return ErrInvalidMessage
+		return ErrInvalidMessage
 	}
 
 	query := `INSERT INTO jobs (job_id, type, payload) VALUES($1, $2, $3)
@@ -96,39 +95,37 @@ func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB)error
 		input.Type,
 		input.Payload,
 	)
-	if err != nil{
+	if err != nil {
 		return err
 	}
-
 
 	return nil
 }
 
-
-func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB)error{
+func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB) error {
 	maxAttempts := 3
 	var lastErr error
-	
-	for attempt := 1; attempt <= maxAttempts; attempt++{
-		if err := ctx.Err(); err != nil{
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
 			lastErr = err
 			return err
 		}
 
 		err := ProcessMessage(ctx, message, db)
-		if errors.Is(err, ErrInvalidMessage){
+		if errors.Is(err, ErrInvalidMessage) {
 			return err
 		}
-		if err == nil{
+		if err == nil {
 			return nil
 		}
 
 		lastErr = err
 
-		if attempt < maxAttempts{
-			delay := time.Duration(attempt)*time.Second
+		if attempt < maxAttempts {
+			delay := time.Duration(attempt) * time.Second
 
-			select{
+			select {
 			case <-time.After(delay):
 				fmt.Println("Retrying...")
 			case <-ctx.Done():
@@ -139,8 +136,24 @@ func ProcessWithRetry(ctx context.Context, message kafka.Message, db *sql.DB)err
 	return fmt.Errorf("all retry attempts failed: %w", lastErr)
 }
 
-func SendToDLQ(ctx context.Context, writer *kafka.Writer, message kafka.Message) error {
-    message.Topic = ""
-    err := writer.WriteMessages(ctx, message)
-    return err
+func SendToDLQ(ctx context.Context, writer *kafka.Writer, message kafka.Message, processErr error) error {
+	dlqMessage := DLQMessage{
+		OriginalTopic: message.Topic,
+		OriginalValue: message.Value,
+		ErrorReason:   processErr.Error(),
+		FailedAt:      time.Now(),
+	}
+
+	dlqValue, err := json.Marshal(dlqMessage)
+	if err != nil {
+		return err
+	}
+
+	err = writer.WriteMessages(ctx, kafka.Message{
+		Value: dlqValue,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

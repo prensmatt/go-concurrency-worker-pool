@@ -1,38 +1,38 @@
 package main
 
-import(
+import (
 	"encoding/json"
 	"time"
 )
 
-type Job struct{
-	ID          int64                `json:"id"`
-	JobID       string               `json:"job_id"`
-	Type        string               `json:"type"`
-	Payload     json.RawMessage      `json:"payload"`
-	Status      string               `json:"status"`
-	CreatedAt   time.Time            `json:"created_at"`
+type Job struct {
+	ID        int64           `json:"id"`
+	JobID     string          `json:"job_id"`
+	Type      string          `json:"type"`
+	Payload   json.RawMessage `json:"payload"`
+	Status    string          `json:"status"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
-type CreateJobRequest struct{
-	JobID   string						`json:"job_id"`					
-	Type    string						`json:"type"`
-	Payload json.RawMessage		`json:"payload"`
+type CreateJobRequest struct {
+	JobID   string          `json:"job_id"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
 }
 
-type UpdateJobRequest struct{
+type UpdateJobRequest struct {
 	Status string `json:"status"`
 }
 
-type JobMessage struct{
-	JobID    string  				 `json:"job_id"`
-	Type     string 				 `json:"type"`
-	Payload  json.RawMessage `json:"payload"`
+type JobMessage struct {
+	JobID   string          `json:"job_id"`
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
 }
 
-type DLQMessage struct{
-	OriginalTopic  string						`json:"original_topic"`
-	OriginalValue  json.RawMessage  `json:"original_value"`
-	ErrorReason    string						`json:"error_reason"`
-	FailedAt       time.Time				`json:"failed_at"`
+type DLQMessage struct {
+	OriginalTopic string          `json:"original_topic"`
+	OriginalValue json.RawMessage `json:"original_value"`
+	ErrorReason   string          `json:"error_reason"`
+	FailedAt      time.Time       `json:"failed_at"`
 }
