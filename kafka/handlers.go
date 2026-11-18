@@ -8,10 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/segmentio/kafka-go"
 )
 
-func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB, writer *kafka.Writer) {
+func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -44,6 +43,15 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB, writer *kafka
 		return
 	}
 
+//add transaction
+
+	tx, err := db.BeginTx(r.Context(), nil)
+	if err != nil{
+		http.Error(w, "Failed to start transaction", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
 	query := `
 		INSERT INTO jobs (job_id, type, payload)
 		VALUES ($1, $2, $3)
@@ -56,7 +64,7 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB, writer *kafka
 	job.Type = strings.TrimSpace(req.Type)
 	job.Payload = req.Payload
 
-	err = db.QueryRowContext(
+	err = tx.QueryRowContext(
 		r.Context(),
 		query,
 		job.JobID,
@@ -73,14 +81,29 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB, writer *kafka
 		return
 	}
 
-	err = PublishJob(r.Context(), writer, JobMessage{
-		JobID:   job.JobID,
-		Type:    job.Type,
+	message := JobMessage{
+		JobID: job.JobID,
+		Type: job.Type,
 		Payload: job.Payload,
-	})
+	}
+	messageJSON, err := json.Marshal(message)
+	if err != nil{
+		http.Error(w, "Failed to encode message", http.StatusInternalServerError)
+		return
+	}
 
-	if err != nil {
-		http.Error(w, "Failed to publish job", http.StatusInternalServerError)
+	outboxQuery := `
+	INSERT INTO outbox (job_id, topic, payload)
+	VALUES ($1, $2, $3)
+	`
+	_, err = tx.ExecContext(r.Context(), outboxQuery, job.JobID, "jobs", messageJSON)
+	if err != nil{
+		http.Error(w, "Failed to save outbox message", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(); err != nil{
+		http.Error(w,"Failed to commit transaction", http.StatusInternalServerError)
 		return
 	}
 
