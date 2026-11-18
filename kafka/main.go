@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net/http"
+
+	"github.com/segmentio/kafka-go"
 )
 
 func main() {
@@ -12,10 +14,17 @@ func main() {
 	}
 	defer db.Close()
 
+	writer := &kafka.Writer{
+		Addr:     kafka.TCP("localhost:9092"),
+		Topic:    "jobs",
+		Balancer: &kafka.LeastBytes{},
+	}
+	defer writer.Close()
+
 	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodPost:
-			CreateJob(w, r, db)
+			CreateJob(w, r, db, writer)
 
 		case http.MethodGet:
 			GetJobs(w, r, db)

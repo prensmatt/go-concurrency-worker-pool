@@ -86,17 +86,23 @@ func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB) erro
 		return ErrInvalidMessage
 	}
 
-	query := `INSERT INTO jobs (job_id, type, payload) VALUES($1, $2, $3)
-	ON CONFLICT (job_id) DO NOTHING`
+	query := `
+	UPDATE jobs
+	SET status = 'completed'
+	WHERE job_id = $1
+	`
 
-	_, err = db.ExecContext(ctx,
-		query,
-		input.JobID,
-		input.Type,
-		input.Payload,
-	)
+	result, err := db.ExecContext(ctx, query, input.JobID)
 	if err != nil {
 		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return fmt.Errorf("Job not found: %s", input.JobID)
 	}
 
 	return nil

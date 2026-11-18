@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/segmentio/kafka-go"
 )
 
-func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB, writer *kafka.Writer) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -68,6 +70,17 @@ func CreateJob(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	if err != nil {
 		http.Error(w, "Failed to create Job", http.StatusInternalServerError)
+		return
+	}
+
+	err = PublishJob(r.Context(), writer, JobMessage{
+		JobID:   job.JobID,
+		Type:    job.Type,
+		Payload: job.Payload,
+	})
+
+	if err != nil {
+		http.Error(w, "Failed to publish job", http.StatusInternalServerError)
 		return
 	}
 
