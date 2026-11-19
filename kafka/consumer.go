@@ -12,7 +12,7 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-func runConsumer() {
+func runConsumer(ctx context.Context) {
 
 	brokerAddress := "localhost:9092"
 	topic := "jobs"
@@ -40,10 +40,13 @@ func runConsumer() {
 
 	defer dlqWriter.Close()
 
-	ctx := context.Background()
 	for {
 		message, err := reader.FetchMessage(ctx)
 		if err != nil {
+			if errors.Is(err, context.Canceled){
+				fmt.Println("Consumer shutting down...")
+				return
+			}
 			fmt.Println("Failed to read message:", err)
 			return
 		}

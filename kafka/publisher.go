@@ -64,6 +64,7 @@ func runPublisher(ctx context.Context, db *sql.DB, writer *kafka.Writer) {
 				continue
 			}
 		case <-ctx.Done():
+			fmt.Println("Publisher shutting down...")
 			return
 		}
 	}
