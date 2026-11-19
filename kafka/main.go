@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+
+	"github.com/segmentio/kafka-go"
 )
 
 func main() {
@@ -11,6 +14,14 @@ func main() {
 		log.Fatal("Database connection failed:", err)
 	}
 	defer db.Close()
+
+	writer := &kafka.Writer{
+		Addr:     kafka.TCP("localhost:9092"),
+		Balancer: &kafka.LeastBytes{},
+	}
+	defer writer.Close()
+
+	go runPublisher(context.Background(), db, writer)
 
 	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {

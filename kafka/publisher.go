@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"database/sql"
-	"time"
 	"fmt"
+	"time"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -51,20 +51,19 @@ func PublishOutbox(ctx context.Context, db *sql.DB, writer *kafka.Writer) error 
 	return nil
 }
 
-
-func runPublisher(ctx context.Context, db *sql.DB, writer *kafka.Writer){
-	ticker := time.NewTicker(2*time.Second)
+func runPublisher(ctx context.Context, db *sql.DB, writer *kafka.Writer) {
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	for{
-		select{
-		case <- ticker.C:
+	for {
+		select {
+		case <-ticker.C:
 			err := PublishOutbox(ctx, db, writer)
-			if err != nil{
+			if err != nil {
 				fmt.Println("Publishing failed:", err)
 				continue
 			}
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return
 		}
 	}
