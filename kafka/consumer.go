@@ -92,17 +92,17 @@ func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB) erro
 	SELECT status FROM jobs WHERE job_id = $1
 	`
 	err = db.QueryRowContext(ctx, checkQuery, input.JobID).Scan(&status)
-	if errors.Is(err, sql.ErrNoRows){
+	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("job not found: %s", input.JobID)
 	}
-	if err != nil{
+	if err != nil {
 		return err
 	}
-	if status == "completed"{
+	if status == "completed" {
 		return nil
 	}
 	if status != "pending" {
-    return fmt.Errorf("unexpected job status: %s", status)
+		return fmt.Errorf("unexpected job status: %s", status)
 	}
 
 	query := `
@@ -124,10 +124,10 @@ func ProcessMessage(ctx context.Context, message kafka.Message, db *sql.DB) erro
 		var currentStatus string
 
 		err = db.QueryRowContext(ctx, checkQuery, input.JobID).Scan(&currentStatus)
-		if err != nil{
+		if err != nil {
 			return err
 		}
-		if currentStatus == "completed"{
+		if currentStatus == "completed" {
 			return nil
 		}
 

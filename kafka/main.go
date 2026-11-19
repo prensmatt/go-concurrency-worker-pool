@@ -22,6 +22,7 @@ func main() {
 	defer writer.Close()
 
 	go runPublisher(context.Background(), db, writer)
+	go runConsumer()
 
 	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
