@@ -4,8 +4,11 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
 	"os/signal"
+	"syscall"
 	"time"
+	"sync"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -30,8 +33,19 @@ func main() {
 	}
 	defer writer.Close()
 
-	go runPublisher(ctx, db, writer)
-	go runConsumer(ctx)
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+	go func(){
+		defer wg.Done()
+		runPublisher(ctx, db, writer)
+		}()
+	go func(){
+		defer wg.Done()
+		runConsumer(ctx)
+		}()
+
+
 
 	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -57,14 +71,14 @@ func main() {
 	})
 
 	server := &http.Server{
-		Addr: ":8000",
+		Addr:    ":8000",
 		Handler: nil,
 	}
 
 	log.Println("Server running on :8000")
 
 	//server shutdown
-	go func(){
+	go func() {
 		<-ctx.Done()
 
 		log.Println("Shutting down HTTP server...")
@@ -72,13 +86,14 @@ func main() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		if err := server.Shutdown(shutdownCtx); err != nil{
+		if err := server.Shutdown(shutdownCtx); err != nil {
 			log.Println("HTTP server shutdown failed:", err)
 		}
 	}()
 
-	if err := server.ListenAndServe();err != nil && err != http.ErrServerClosed{
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
-	
+	wg.Wait()
+	log.Println("Application shutdown complete")
 }

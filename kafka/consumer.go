@@ -43,7 +43,7 @@ func runConsumer(ctx context.Context) {
 	for {
 		message, err := reader.FetchMessage(ctx)
 		if err != nil {
-			if errors.Is(err, context.Canceled){
+			if errors.Is(err, context.Canceled) {
 				fmt.Println("Consumer shutting down...")
 				return
 			}
