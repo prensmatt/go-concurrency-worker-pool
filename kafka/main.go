@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
-	"sync"
 
 	"github.com/segmentio/kafka-go"
 )
@@ -34,18 +34,17 @@ func main() {
 	defer writer.Close()
 
 	var wg sync.WaitGroup
+	shutdownDone := make(chan struct{})
 
 	wg.Add(2)
-	go func(){
+	go func() {
 		defer wg.Done()
 		runPublisher(ctx, db, writer)
-		}()
-	go func(){
+	}()
+	go func() {
 		defer wg.Done()
 		runConsumer(ctx)
-		}()
-
-
+	}()
 
 	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -79,6 +78,8 @@ func main() {
 
 	//server shutdown
 	go func() {
+		defer close(shutdownDone)
+
 		<-ctx.Done()
 
 		log.Println("Shutting down HTTP server...")
@@ -92,8 +93,11 @@ func main() {
 	}()
 
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+		log.Println("Server error:", err)
+		stop()
 	}
 	wg.Wait()
+	<-shutdownDone
+
 	log.Println("Application shutdown complete")
 }

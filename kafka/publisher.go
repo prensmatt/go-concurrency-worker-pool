@@ -16,8 +16,15 @@ func PublishOutbox(ctx context.Context, db *sql.DB, writer *kafka.Writer) error 
 	WHERE published_at IS NULL
 	ORDER BY id
 	LIMIT 100
+	FOR UPDATE SKIP LOCKED
 	`
-	rows, err := db.QueryContext(ctx, query)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, query)
 	if err != nil {
 		return err
 	}
@@ -40,20 +47,40 @@ func PublishOutbox(ctx context.Context, db *sql.DB, writer *kafka.Writer) error 
 		updateQuery := `
 		UPDATE outbox SET published_at = $1 WHERE id = $2
 		`
-		_, err = db.ExecContext(ctx, updateQuery, time.Now(), item.ID)
+		result, err := tx.ExecContext(ctx, updateQuery, time.Now(), item.ID)
 		if err != nil {
 			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected != 1 {
+			return fmt.Errorf("expected 1 updated row, got %d", affected)
 		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	return nil
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func runPublisher(ctx context.Context, db *sql.DB, writer *kafka.Writer) {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
+
+	if ctx.Err() != nil {
+		fmt.Println("Publisher shutting down...")
+		return
+	}
+
+	err := PublishOutbox(ctx, db, writer)
+	if err != nil {
+		fmt.Println("Publishing failed:", err)
+	}
 
 	for {
 		select {
